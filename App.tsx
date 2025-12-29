@@ -6,15 +6,13 @@ import { useDeviceDetection } from './hooks/useDeviceDetection';
 import { useInterfaceLanguage } from './hooks/useInterfaceLanguage';
 import { LEVELS, AUDIO_ASSETS } from './constants';
 import {
-  initYandexSdk,
+  initVKBridge,
   getCloudData,
   saveCloudData,
-  gameReady,
-  startGameplay,
   showFullscreenAd as showFullscreenAdBase,
   showRewardedVideo as showRewardedVideoBase,
   GameProgress
-} from './services/yandexSdk';
+} from './services/vkBridge';
 
 const PROGRESS_KEY = 'liquid_puzzle_v2_progress';
 const MAX_LEVEL_KEY = 'liquid_puzzle_v2_max_level';
@@ -200,11 +198,11 @@ const App: React.FC = () => {
   // Load progress and audio settings on mount
   useEffect(() => {
     const loadProgress = async () => {
-      // Сначала инициализируем Yandex SDK
-      await initYandexSdk();
+      // Сначала инициализируем VK Bridge
+      await initVKBridge();
 
       // Пробуем загрузить из облачных сохранений
-      const cloudData = await getCloudData();
+      const cloudData = await getCloudData(PROGRESS_KEY);
 
       if (cloudData) {
         // Используем облачные данные
@@ -270,33 +268,6 @@ const App: React.FC = () => {
       }
     };
   }, [loadAudioBuffer, stopMusic]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const signalGameReady = async () => {
-      await initYandexSdk();
-      if (cancelled) return;
-      gameReady();
-    };
-
-    if (document.readyState === 'complete') {
-      signalGameReady();
-    } else {
-      const handleLoad = () => {
-        signalGameReady();
-      };
-      window.addEventListener('load', handleLoad);
-      return () => {
-        cancelled = true;
-        window.removeEventListener('load', handleLoad);
-      };
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -403,13 +374,13 @@ const App: React.FC = () => {
     setMaxReachedLevelIndex(newMax);
     localStorage.setItem(MAX_LEVEL_KEY, newMax.toString());
 
-    // Сохраняем в облачные сохранения Яндекса
+    // Сохраняем в облачные сохранения VK
     const progress: GameProgress = {
       currentLevel: currentIdx,
       maxLevel: newMax,
       audioSettings: audioSettings
     };
-    saveCloudData(progress);
+    saveCloudData(PROGRESS_KEY, progress);
   }, [maxReachedLevelIndex, audioSettings]);
 
   const handleStartNewGame = () => {
@@ -429,13 +400,11 @@ const App: React.FC = () => {
     setMaxReachedLevelIndex(0);
     saveProgress(0, 0);
     setView('game');
-    startGameplay();
   };
 
   const handleContinue = () => {
     initAudioContext();
     setView('game');
-    startGameplay();
   };
 
   const handleOpenLevelSelect = () => {
@@ -447,7 +416,6 @@ const App: React.FC = () => {
     setCurrentLevelIndex(index);
     saveProgress(index, index);
     setView('game');
-    startGameplay();
   };
 
   const handleLevelComplete = () => {
