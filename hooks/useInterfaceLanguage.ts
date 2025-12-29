@@ -1,24 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getLanguage, setInterfaceLanguage } from '../services/yandexSdk';
 
 export function useInterfaceLanguage(preferredLang: 'ru' | 'en' = 'ru') {
-  const [language, setLanguage] = useState<string>(() => getLanguage());
+  const [language, setLanguage] = useState<string>(preferredLang);
 
   useEffect(() => {
-    let mounted = true;
-
-    const applyLanguage = async () => {
-      const lang = await setInterfaceLanguage(preferredLang);
-      if (mounted) {
-        setLanguage(lang);
-      }
-    };
-
-    applyLanguage();
-
-    return () => {
-      mounted = false;
-    };
+    setLanguage(preferredLang);
   }, [preferredLang]);
 
   return language;

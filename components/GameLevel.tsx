@@ -4,7 +4,6 @@ import { withBase } from '../constants';
 import Container from './Container';
 import Modal from './Modal';
 import { RotateCcw, Info, Droplets, Undo2, LogOut, Lightbulb, Lock, ChevronRight, Trash2, Music, Volume2, VolumeX, Plus, Minus } from 'lucide-react';
-import { stopGameplay } from '../services/yandexSdk';
 
 interface GameLevelProps {
   level: Level;
@@ -146,7 +145,6 @@ const GameLevel: React.FC<GameLevelProps> = ({
     });
     if (isWin && containers.length > 0) {
       setTimeout(() => {
-        stopGameplay();
         setShowWinModal(true);
       }, 600);
     }
