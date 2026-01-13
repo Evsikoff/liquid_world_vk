@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MainMenu from './components/MainMenu';
 import GameLevel from './components/GameLevel';
 import LevelSelect from './components/LevelSelect';
+import LoadingScreen from './components/LoadingScreen';
 import { useDeviceDetection } from './hooks/useDeviceDetection';
 import { useInterfaceLanguage } from './hooks/useInterfaceLanguage';
 import { LEVELS, AUDIO_ASSETS } from './constants';
@@ -48,6 +49,7 @@ const App: React.FC = () => {
   const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
   const [maxReachedLevelIndex, setMaxReachedLevelIndex] = useState(0);
   const [stageAspectRatio, setStageAspectRatio] = useState(16 / 9);
+  const [isInitializing, setIsInitializing] = useState(true);
   const language = useInterfaceLanguage('ru');
 
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -204,91 +206,96 @@ const App: React.FC = () => {
   // Load progress and audio settings on mount
   useEffect(() => {
     const loadProgress = async () => {
-      // Сначала инициализируем VK Bridge
-      const bridgeInitialized = await initVKBridge();
+      try {
+        // Сначала инициализируем VK Bridge
+        const bridgeInitialized = await initVKBridge();
 
-      // Пробуем загрузить из облачных сохранений
-      let cloudData: GameProgress | null = null;
-      if (bridgeInitialized) {
-        cloudData = await getCloudData(PROGRESS_KEY);
-      }
-
-      // Загружаем данные из localStorage
-      const savedCurrent = localStorage.getItem(PROGRESS_KEY);
-      const savedMax = localStorage.getItem(MAX_LEVEL_KEY);
-      const savedAudio = localStorage.getItem(AUDIO_SETTINGS_KEY);
-
-      let localCurrentLevel = 0;
-      let localMaxLevel = 0;
-      let localAudioSettings = { music: true, sfx: true };
-
-      if (savedCurrent) {
-        const idx = parseInt(savedCurrent, 10);
-        if (!isNaN(idx) && idx < LEVELS.length) {
-          localCurrentLevel = idx;
+        // Пробуем загрузить из облачных сохранений
+        let cloudData: GameProgress | null = null;
+        if (bridgeInitialized) {
+          cloudData = await getCloudData(PROGRESS_KEY);
         }
-      }
 
-      if (savedMax) {
-        const idx = parseInt(savedMax, 10);
-        if (!isNaN(idx)) {
-          localMaxLevel = idx;
+        // Загружаем данные из localStorage
+        const savedCurrent = localStorage.getItem(PROGRESS_KEY);
+        const savedMax = localStorage.getItem(MAX_LEVEL_KEY);
+        const savedAudio = localStorage.getItem(AUDIO_SETTINGS_KEY);
+
+        let localCurrentLevel = 0;
+        let localMaxLevel = 0;
+        let localAudioSettings = { music: true, sfx: true };
+
+        if (savedCurrent) {
+          const idx = parseInt(savedCurrent, 10);
+          if (!isNaN(idx) && idx < LEVELS.length) {
+            localCurrentLevel = idx;
+          }
         }
-      }
 
-      if (savedAudio) {
-        try {
-          localAudioSettings = JSON.parse(savedAudio);
-        } catch (e) {
-          console.error("Failed to parse audio settings");
+        if (savedMax) {
+          const idx = parseInt(savedMax, 10);
+          if (!isNaN(idx)) {
+            localMaxLevel = idx;
+          }
         }
-      }
 
-      if (cloudData) {
-        // Сравниваем облачные и локальные данные, используем более актуальные
-        const useCloud = cloudData.maxLevel >= localMaxLevel;
+        if (savedAudio) {
+          try {
+            localAudioSettings = JSON.parse(savedAudio);
+          } catch (e) {
+            console.error("Failed to parse audio settings");
+          }
+        }
 
-        if (useCloud) {
-          console.log('Using cloud data (more progress):', cloudData);
-          setCurrentLevelIndex(cloudData.currentLevel);
-          setMaxReachedLevelIndex(cloudData.maxLevel);
-          setAudioSettings(cloudData.audioSettings);
+        if (cloudData) {
+          // Сравниваем облачные и локальные данные, используем более актуальные
+          const useCloud = cloudData.maxLevel >= localMaxLevel;
 
-          // Синхронизируем localStorage с облаком
-          localStorage.setItem(PROGRESS_KEY, cloudData.currentLevel.toString());
-          localStorage.setItem(MAX_LEVEL_KEY, cloudData.maxLevel.toString());
-          localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify(cloudData.audioSettings));
+          if (useCloud) {
+            console.log('Using cloud data (more progress):', cloudData);
+            setCurrentLevelIndex(cloudData.currentLevel);
+            setMaxReachedLevelIndex(cloudData.maxLevel);
+            setAudioSettings(cloudData.audioSettings);
+
+            // Синхронизируем localStorage с облаком
+            localStorage.setItem(PROGRESS_KEY, cloudData.currentLevel.toString());
+            localStorage.setItem(MAX_LEVEL_KEY, cloudData.maxLevel.toString());
+            localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify(cloudData.audioSettings));
+          } else {
+            console.log('Using local data (more progress):', { localCurrentLevel, localMaxLevel });
+            setCurrentLevelIndex(localCurrentLevel);
+            setMaxReachedLevelIndex(localMaxLevel);
+            setAudioSettings(localAudioSettings);
+
+            // Синхронизируем облако с localStorage
+            const progress: GameProgress = {
+              currentLevel: localCurrentLevel,
+              maxLevel: localMaxLevel,
+              audioSettings: localAudioSettings
+            };
+            await saveCloudData(PROGRESS_KEY, progress);
+          }
         } else {
-          console.log('Using local data (more progress):', { localCurrentLevel, localMaxLevel });
+          // Нет облачных данных, используем localStorage
+          console.log('No cloud data, using localStorage:', { localCurrentLevel, localMaxLevel });
           setCurrentLevelIndex(localCurrentLevel);
           setMaxReachedLevelIndex(localMaxLevel);
           setAudioSettings(localAudioSettings);
 
-          // Синхронизируем облако с localStorage
-          const progress: GameProgress = {
-            currentLevel: localCurrentLevel,
-            maxLevel: localMaxLevel,
-            audioSettings: localAudioSettings
-          };
-          await saveCloudData(PROGRESS_KEY, progress);
+          // Мигрируем localStorage в облако если есть прогресс
+          if (localMaxLevel > 0 && bridgeInitialized) {
+            console.log('Migrating localStorage progress to cloud');
+            const progress: GameProgress = {
+              currentLevel: localCurrentLevel,
+              maxLevel: localMaxLevel,
+              audioSettings: localAudioSettings
+            };
+            await saveCloudData(PROGRESS_KEY, progress);
+          }
         }
-      } else {
-        // Нет облачных данных, используем localStorage
-        console.log('No cloud data, using localStorage:', { localCurrentLevel, localMaxLevel });
-        setCurrentLevelIndex(localCurrentLevel);
-        setMaxReachedLevelIndex(localMaxLevel);
-        setAudioSettings(localAudioSettings);
-
-        // Мигрируем localStorage в облако если есть прогресс
-        if (localMaxLevel > 0 && bridgeInitialized) {
-          console.log('Migrating localStorage progress to cloud');
-          const progress: GameProgress = {
-            currentLevel: localCurrentLevel,
-            maxLevel: localMaxLevel,
-            audioSettings: localAudioSettings
-          };
-          await saveCloudData(PROGRESS_KEY, progress);
-        }
+      } finally {
+        // Убираем загрузочный экран после завершения загрузки данных
+        setIsInitializing(false);
       }
     };
 
@@ -508,6 +515,10 @@ const App: React.FC = () => {
     saveProgress(currentLevelIndex, maxReachedLevelIndex);
     setView('menu');
   };
+
+  if (isInitializing) {
+    return <LoadingScreen message="Синхронизация данных..." />;
+  }
 
   return (
     <div className="app-shell" data-lang={language}>
