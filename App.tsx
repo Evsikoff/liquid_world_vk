@@ -330,6 +330,9 @@ const App: React.FC = () => {
   }, [loadAudioBuffer, stopMusic]);
 
   useEffect(() => {
+    // Skip applying metrics while loading screen is shown (stageRef not yet mounted)
+    if (isInitializing) return;
+
     const handleResize = () => {
       if (view === 'game') {
         applyResponsiveStageMetrics();
@@ -341,7 +344,7 @@ const App: React.FC = () => {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [view, applyFixedStageMetrics, applyResponsiveStageMetrics]);
+  }, [view, isInitializing, applyFixedStageMetrics, applyResponsiveStageMetrics]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
