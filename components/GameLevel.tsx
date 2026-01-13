@@ -266,6 +266,15 @@ const GameLevel: React.FC<GameLevelProps> = ({
       {/* Header */}
       <header className="game-level-header">
         <div className="game-level-header-left">
+          <button onClick={toggleMusic} className={`game-level-btn ${audioSettings.music ? 'game-level-btn-music-on' : 'game-level-btn-music-off'}`}>
+            <Music size={isMobile ? 16 : 20} className={audioSettings.music ? '' : 'opacity-40'} />
+          </button>
+          <button onClick={toggleSfx} className={`game-level-btn ${audioSettings.sfx ? 'game-level-btn-sfx-on' : 'game-level-btn-sfx-off'}`}>
+            {audioSettings.sfx ? <Volume2 size={isMobile ? 16 : 20} /> : <VolumeX size={isMobile ? 16 : 20} />}
+          </button>
+
+          {!isMobile && <div className="game-level-divider"></div>}
+
           <button onClick={onExit} className="game-level-btn game-level-btn-exit">
             <LogOut size={isMobile ? 18 : 22} />
           </button>
@@ -276,15 +285,6 @@ const GameLevel: React.FC<GameLevelProps> = ({
         </div>
 
         <div className="game-level-header-right">
-          <button onClick={toggleMusic} className={`game-level-btn ${audioSettings.music ? 'game-level-btn-music-on' : 'game-level-btn-music-off'}`}>
-            <Music size={isMobile ? 16 : 20} className={audioSettings.music ? '' : 'opacity-40'} />
-          </button>
-          <button onClick={toggleSfx} className={`game-level-btn ${audioSettings.sfx ? 'game-level-btn-sfx-on' : 'game-level-btn-sfx-off'}`}>
-            {audioSettings.sfx ? <Volume2 size={isMobile ? 16 : 20} /> : <VolumeX size={isMobile ? 16 : 20} />}
-          </button>
-
-          {!isMobile && <div className="game-level-divider"></div>}
-
           <button
             onClick={async () => {
               await showFullscreenAd();

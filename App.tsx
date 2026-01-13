@@ -61,6 +61,12 @@ const App: React.FC = () => {
     sfx: true
   });
 
+  // Ref to avoid callback recreation when audioSettings changes
+  const audioSettingsRef = useRef(audioSettings);
+  useEffect(() => {
+    audioSettingsRef.current = audioSettings;
+  }, [audioSettings]);
+
   const applyResponsiveStageMetrics = useCallback(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -108,9 +114,9 @@ const App: React.FC = () => {
 
   const updateMusicGainForVisibility = useCallback(() => {
     if (!musicGainRef.current) return;
-    const shouldMute = document.visibilityState === 'hidden' || !audioSettings.music;
+    const shouldMute = document.visibilityState === 'hidden' || !audioSettingsRef.current.music;
     musicGainRef.current.gain.value = shouldMute ? 0 : 1;
-  }, [audioSettings.music]);
+  }, []);
 
   // Initialize AudioContext on first user interaction
   const initAudioContext = useCallback(() => {
@@ -199,42 +205,89 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadProgress = async () => {
       // Сначала инициализируем VK Bridge
-      await initVKBridge();
+      const bridgeInitialized = await initVKBridge();
 
       // Пробуем загрузить из облачных сохранений
-      const cloudData = await getCloudData(PROGRESS_KEY);
+      let cloudData: GameProgress | null = null;
+      if (bridgeInitialized) {
+        cloudData = await getCloudData(PROGRESS_KEY);
+      }
+
+      // Загружаем данные из localStorage
+      const savedCurrent = localStorage.getItem(PROGRESS_KEY);
+      const savedMax = localStorage.getItem(MAX_LEVEL_KEY);
+      const savedAudio = localStorage.getItem(AUDIO_SETTINGS_KEY);
+
+      let localCurrentLevel = 0;
+      let localMaxLevel = 0;
+      let localAudioSettings = { music: true, sfx: true };
+
+      if (savedCurrent) {
+        const idx = parseInt(savedCurrent, 10);
+        if (!isNaN(idx) && idx < LEVELS.length) {
+          localCurrentLevel = idx;
+        }
+      }
+
+      if (savedMax) {
+        const idx = parseInt(savedMax, 10);
+        if (!isNaN(idx)) {
+          localMaxLevel = idx;
+        }
+      }
+
+      if (savedAudio) {
+        try {
+          localAudioSettings = JSON.parse(savedAudio);
+        } catch (e) {
+          console.error("Failed to parse audio settings");
+        }
+      }
 
       if (cloudData) {
-        // Используем облачные данные
-        console.log('Loaded progress from cloud:', cloudData);
-        setCurrentLevelIndex(cloudData.currentLevel);
-        setMaxReachedLevelIndex(cloudData.maxLevel);
-        setAudioSettings(cloudData.audioSettings);
+        // Сравниваем облачные и локальные данные, используем более актуальные
+        const useCloud = cloudData.maxLevel >= localMaxLevel;
+
+        if (useCloud) {
+          console.log('Using cloud data (more progress):', cloudData);
+          setCurrentLevelIndex(cloudData.currentLevel);
+          setMaxReachedLevelIndex(cloudData.maxLevel);
+          setAudioSettings(cloudData.audioSettings);
+
+          // Синхронизируем localStorage с облаком
+          localStorage.setItem(PROGRESS_KEY, cloudData.currentLevel.toString());
+          localStorage.setItem(MAX_LEVEL_KEY, cloudData.maxLevel.toString());
+          localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify(cloudData.audioSettings));
+        } else {
+          console.log('Using local data (more progress):', { localCurrentLevel, localMaxLevel });
+          setCurrentLevelIndex(localCurrentLevel);
+          setMaxReachedLevelIndex(localMaxLevel);
+          setAudioSettings(localAudioSettings);
+
+          // Синхронизируем облако с localStorage
+          const progress: GameProgress = {
+            currentLevel: localCurrentLevel,
+            maxLevel: localMaxLevel,
+            audioSettings: localAudioSettings
+          };
+          await saveCloudData(PROGRESS_KEY, progress);
+        }
       } else {
-        // Фолбэк на localStorage
-        console.log('No cloud data, falling back to localStorage');
-        const savedCurrent = localStorage.getItem(PROGRESS_KEY);
-        const savedMax = localStorage.getItem(MAX_LEVEL_KEY);
-        const savedAudio = localStorage.getItem(AUDIO_SETTINGS_KEY);
+        // Нет облачных данных, используем localStorage
+        console.log('No cloud data, using localStorage:', { localCurrentLevel, localMaxLevel });
+        setCurrentLevelIndex(localCurrentLevel);
+        setMaxReachedLevelIndex(localMaxLevel);
+        setAudioSettings(localAudioSettings);
 
-        if (savedMax) {
-          const maxIdx = parseInt(savedMax, 10);
-          setMaxReachedLevelIndex(isNaN(maxIdx) ? 0 : maxIdx);
-        }
-
-        if (savedCurrent) {
-          const currentIdx = parseInt(savedCurrent, 10);
-          if (!isNaN(currentIdx) && currentIdx < LEVELS.length) {
-            setCurrentLevelIndex(currentIdx);
-          }
-        }
-
-        if (savedAudio) {
-          try {
-            setAudioSettings(JSON.parse(savedAudio));
-          } catch (e) {
-            console.error("Failed to parse audio settings");
-          }
+        // Мигрируем localStorage в облако если есть прогресс
+        if (localMaxLevel > 0 && bridgeInitialized) {
+          console.log('Migrating localStorage progress to cloud');
+          const progress: GameProgress = {
+            currentLevel: localCurrentLevel,
+            maxLevel: localMaxLevel,
+            audioSettings: localAudioSettings
+          };
+          await saveCloudData(PROGRESS_KEY, progress);
         }
       }
     };
@@ -296,19 +349,34 @@ const App: React.FC = () => {
     };
   }, [updateMusicGainForVisibility]);
 
+  // Update music gain when audio settings change
+  useEffect(() => {
+    updateMusicGainForVisibility();
+  }, [audioSettings.music, updateMusicGainForVisibility]);
+
+  // Track current music URL to avoid unnecessary restarts
+  const currentMusicUrlRef = useRef<string | null>(null);
+
   // Music playback control based on view and settings
   useEffect(() => {
-    if (!audioSettings.music) {
-      stopMusic();
-      return;
-    }
-
     const musicUrl = (view === 'menu' || view === 'levelSelect')
       ? AUDIO_ASSETS.music.menu
       : AUDIO_ASSETS.music.game;
 
-    playMusic(musicUrl);
-  }, [view, audioSettings.music, playMusic, stopMusic]);
+    // Only start/change music if URL changed or music is not playing
+    if (audioSettingsRef.current.music && musicUrl !== currentMusicUrlRef.current) {
+      currentMusicUrlRef.current = musicUrl;
+      playMusic(musicUrl);
+    }
+  }, [view, playMusic]);
+
+  // Handle music toggle separately - don't restart, just control gain
+  useEffect(() => {
+    if (!audioSettings.music) {
+      // Music is muted via gain, no need to stop the source
+      // This prevents the music from restarting when re-enabled
+    }
+  }, [audioSettings.music]);
 
   // SFX playback helper
   const playRandomSfx = useCallback((type: 'transfer' | 'sink' | 'tap') => {
@@ -367,20 +435,26 @@ const App: React.FC = () => {
     });
   };
 
-  const saveProgress = useCallback((currentIdx: number, maxIdx: number) => {
+  const saveProgress = useCallback(async (currentIdx: number, maxIdx: number) => {
     // Сохраняем в localStorage
     localStorage.setItem(PROGRESS_KEY, currentIdx.toString());
     const newMax = Math.max(maxReachedLevelIndex, maxIdx);
     setMaxReachedLevelIndex(newMax);
     localStorage.setItem(MAX_LEVEL_KEY, newMax.toString());
 
-    // Сохраняем в облачные сохранения VK
+    // Сохраняем в облачные сохранения VK (с ожиданием)
     const progress: GameProgress = {
       currentLevel: currentIdx,
       maxLevel: newMax,
       audioSettings: audioSettings
     };
-    saveCloudData(PROGRESS_KEY, progress);
+
+    try {
+      await saveCloudData(PROGRESS_KEY, progress);
+      console.log('Progress saved to VK Cloud successfully:', progress);
+    } catch (error) {
+      console.error('Failed to save progress to VK Cloud:', error);
+    }
   }, [maxReachedLevelIndex, audioSettings]);
 
   const handleStartNewGame = () => {
