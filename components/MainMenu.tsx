@@ -30,7 +30,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
       <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
 
       {/* Аудио Контролы */}
-      <div className={`flex z-50 ${isMobile ? 'w-full justify-end gap-2 mb-3' : 'absolute top-6 right-6 gap-3'}`}>
+      <div className={`flex z-50 ${isMobile ? 'w-full justify-start gap-2 mb-3' : 'absolute top-6 left-6 gap-3'}`}>
         <button
           onClick={toggleMusic}
           className={`rounded-2xl shadow-lg border-2 transition-all active:scale-90 ${isMobile ? 'p-2.5' : 'p-3'} ${audioSettings.music ? 'bg-white border-blue-200 text-blue-500' : 'bg-slate-200 border-slate-300 text-slate-400'}`}

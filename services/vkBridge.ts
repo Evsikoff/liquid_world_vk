@@ -12,6 +12,31 @@ export interface GameProgress {
 
 let isInitialized = false;
 
+// Утилита для задержки
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Функция повторных попыток с экспоненциальной задержкой
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries - 1) {
+        const waitTime = baseDelay * Math.pow(2, attempt);
+        console.log(`Retry attempt ${attempt + 1}/${maxRetries}, waiting ${waitTime}ms`);
+        await delay(waitTime);
+      }
+    }
+  }
+  throw lastError;
+}
+
 // Инициализация VK Bridge
 export async function initVKBridge(): Promise<boolean> {
   if (isInitialized) {
@@ -19,7 +44,9 @@ export async function initVKBridge(): Promise<boolean> {
   }
 
   try {
-    await vkBridge.send('VKWebAppInit');
+    await withRetry(async () => {
+      await vkBridge.send('VKWebAppInit');
+    }, 3, 500);
     isInitialized = true;
     console.log('VK Bridge initialized successfully');
     return true;
@@ -29,10 +56,13 @@ export async function initVKBridge(): Promise<boolean> {
   }
 }
 
-// Получение данных из VK Storage
+// Получение данных из VK Storage с повторными попытками
 export async function getCloudData(key: string): Promise<GameProgress | null> {
   try {
-    const data = await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
+    const data = await withRetry(async () => {
+      return await vkBridge.send('VKWebAppStorageGet', { keys: [key] });
+    }, 3, 1000);
+
     if (data.keys && data.keys[0] && data.keys[0].value) {
       const parsedData = JSON.parse(data.keys[0].value);
       console.log('Loaded data from VK Storage:', parsedData);
@@ -46,22 +76,24 @@ export async function getCloudData(key: string): Promise<GameProgress | null> {
     }
     return null;
   } catch (error) {
-    console.error('Failed to get VK Storage data:', error);
+    console.error('Failed to get VK Storage data after retries:', error);
     return null;
   }
 }
 
-// Сохранение данных в VK Storage
+// Сохранение данных в VK Storage с повторными попытками
 export async function saveCloudData(key: string, value: GameProgress): Promise<boolean> {
   try {
-    await vkBridge.send('VKWebAppStorageSet', {
-      key: key,
-      value: JSON.stringify(value),
-    });
-    console.log('Data saved to VK Storage successfully');
+    await withRetry(async () => {
+      await vkBridge.send('VKWebAppStorageSet', {
+        key: key,
+        value: JSON.stringify(value),
+      });
+    }, 3, 1000);
+    console.log('Data saved to VK Storage successfully:', value);
     return true;
   } catch (error) {
-    console.error('Failed to save VK Storage data:', error);
+    console.error('Failed to save VK Storage data after retries:', error);
     return false;
   }
 }
