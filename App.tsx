@@ -303,8 +303,8 @@ const App: React.FC = () => {
           // Note: In a production environment, this API call should be made from a backend server
           // to prevent CORS issues and exposing API keys. For the purpose of this implementation
           // we are using environment variables.
-          const clientId = import.meta.env.VITE_OZON_CLIENT_ID || '1047629';
-          const apiKey = import.meta.env.VITE_OZON_API_KEY || 'a5944235-a322-4134-9a93-07787321fa9b';
+          const clientId = import.meta.env.VITE_OZON_CLIENT_ID;
+          const apiKey = import.meta.env.VITE_OZON_API_KEY;
 
           const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
             method: 'POST',
