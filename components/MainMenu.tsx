@@ -11,6 +11,7 @@ interface MainMenuProps {
   toggleMusic: () => void;
   toggleSfx: () => void;
   isMobile?: boolean;
+  showOzonBanner?: boolean;
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({
@@ -22,7 +23,8 @@ const MainMenu: React.FC<MainMenuProps> = ({
   audioSettings,
   toggleMusic,
   toggleSfx,
-  isMobile = false
+  isMobile = false,
+  showOzonBanner = false
 }) => {
   return (
     <div className={`h-full w-full bg-slate-100 flex relative overflow-hidden ${isMobile ? 'flex-col items-center justify-start pt-4 px-4 pb-4' : 'items-center justify-center p-4'}`}>
@@ -114,6 +116,22 @@ const MainMenu: React.FC<MainMenuProps> = ({
           FLL Games • 2025
         </div>
       </div>
+
+      {showOzonBanner && (
+        <a
+          href="https://vk.ru/market/product/nastolnaya-igra-quotadmiral-taktika-risk-i-sudbaquot-kompaktnaya-versia-227786453-8922274"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-4 right-4 z-[60] shadow-xl rounded-2xl overflow-hidden transition-transform hover:scale-105"
+          style={{ width: 'min(500px, 30vw)', height: 'min(500px, 30vw)', minWidth: '100px', minHeight: '100px' }}
+        >
+          <img
+            src="https://storage.yandexcloud.net/kadastrgame/98884.png"
+            alt="Настольная игра Адмирал"
+            className="w-full h-full object-cover"
+          />
+        </a>
+      )}
 
       <style>{`
         @keyframes bounce-subtle {

@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [maxReachedLevelIndex, setMaxReachedLevelIndex] = useState(0);
   const [stageAspectRatio, setStageAspectRatio] = useState(16 / 9);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showOzonBanner, setShowOzonBanner] = useState(false);
   const language = useInterfaceLanguage('ru');
 
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -294,6 +295,46 @@ const App: React.FC = () => {
           }
         }
       } finally {
+        // Выполняем запрос к Ozon API
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          // Note: In a production environment, this API call should be made from a backend server
+          // to prevent CORS issues and exposing API keys. For the purpose of this implementation
+          // we are using environment variables.
+          const clientId = import.meta.env.VITE_OZON_CLIENT_ID || '1047629';
+          const apiKey = import.meta.env.VITE_OZON_API_KEY || 'a5944235-a322-4134-9a93-07787321fa9b';
+
+          const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+            method: 'POST',
+            headers: {
+              'Client-Id': clientId,
+              'Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sku: ["918760951"]
+            }),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (ozonResponse.ok) {
+            const data = await ozonResponse.json();
+            if (data?.items && data.items.length > 0) {
+              const item = data.items[0];
+              const availableAvailability = item.availabilities?.find((a: any) => a.availability === 'AVAILABLE');
+              if (availableAvailability) {
+                setShowOzonBanner(true);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Ozon API check failed:', error);
+        }
+
         // Убираем загрузочный экран после завершения загрузки данных
         setIsInitializing(false);
       }
@@ -540,6 +581,7 @@ const App: React.FC = () => {
                 toggleMusic={toggleMusic}
                 toggleSfx={toggleSfx}
                 isMobile={isMobile}
+                showOzonBanner={showOzonBanner}
               />
             )}
 
