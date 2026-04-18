@@ -306,23 +306,27 @@ const App: React.FC = () => {
           const clientId = import.meta.env.VITE_OZON_CLIENT_ID;
           const apiKey = import.meta.env.VITE_OZON_API_KEY;
 
-          const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
-            method: 'POST',
-            headers: {
-              'Client-Id': clientId,
-              'Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              sku: ["918760951"]
-            }),
-            signal: controller.signal
-          });
+          if (!clientId || !apiKey) {
+            console.warn('[App] Ozon API credentials (VITE_OZON_CLIENT_ID or VITE_OZON_API_KEY) are missing. Skipping Ozon API request. Please check your .env file.');
+            clearTimeout(timeoutId);
+          } else {
+            const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+              method: 'POST',
+              headers: {
+                'Client-Id': clientId,
+                'Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                sku: ["918760951"]
+              }),
+              signal: controller.signal
+            });
 
-          clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-          if (ozonResponse.ok) {
-            console.log('[App] Ozon API request successful.');
+            if (ozonResponse.ok) {
+              console.log('[App] Ozon API request successful.');
             const data = await ozonResponse.json();
             if (data?.items && data.items.length > 0) {
               const item = data.items[0];
@@ -333,13 +337,14 @@ const App: React.FC = () => {
               } else {
                 console.log('[App] Ozon product is not AVAILABLE.');
               }
+              } else {
+                 console.log('[App] Ozon API response has no items.');
+              }
             } else {
-               console.log('[App] Ozon API response has no items.');
+              // Read response body to provide more context for the error
+              const errorText = await ozonResponse.text();
+              console.log(`[App] Ozon API request failed with status: ${ozonResponse.status}, response: ${errorText}`);
             }
-          } else {
-            // Read response body to provide more context for the error
-            const errorText = await ozonResponse.text();
-            console.log(`[App] Ozon API request failed with status: ${ozonResponse.status}, response: ${errorText}`);
           }
         } catch (error) {
           console.error('Ozon API check failed:', error);
