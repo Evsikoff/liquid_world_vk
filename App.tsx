@@ -322,14 +322,24 @@ const App: React.FC = () => {
           clearTimeout(timeoutId);
 
           if (ozonResponse.ok) {
+            console.log('[App] Ozon API request successful.');
             const data = await ozonResponse.json();
             if (data?.items && data.items.length > 0) {
               const item = data.items[0];
               const availableAvailability = item.availabilities?.find((a: any) => a.availability === 'AVAILABLE');
               if (availableAvailability) {
+                console.log('[App] Ozon product is AVAILABLE. Banner will be shown.');
                 setShowOzonBanner(true);
+              } else {
+                console.log('[App] Ozon product is not AVAILABLE.');
               }
+            } else {
+               console.log('[App] Ozon API response has no items.');
             }
+          } else {
+            // Read response body to provide more context for the error
+            const errorText = await ozonResponse.text();
+            console.log(`[App] Ozon API request failed with status: ${ozonResponse.status}, response: ${errorText}`);
           }
         } catch (error) {
           console.error('Ozon API check failed:', error);
