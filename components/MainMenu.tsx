@@ -42,13 +42,13 @@ const MainMenu: React.FC<MainMenuProps> = ({
   }, []);
 
   // Calculate dynamic banner size to prevent overlapping
-  // We make it at most 30% of width, but also ensure it doesn't exceed 20% of height to avoid overlapping central panel
+  // We make it at most 30% of width, but also ensure it doesn't exceed 30% of height to avoid overlapping central panel
   const bannerSize = Math.max(
     60, // Minimum acceptable size
     Math.min(
       500, // Maximum size
       windowSize.width * 0.25, // Up to 25% of width
-      windowSize.height * 0.15 // Up to 15% of height to prevent vertical overlap
+      windowSize.height * 0.30 // Up to 30% of height to prevent vertical overlap
     )
   );
 
