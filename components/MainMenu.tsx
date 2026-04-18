@@ -11,6 +11,7 @@ interface MainMenuProps {
   toggleMusic: () => void;
   toggleSfx: () => void;
   isMobile?: boolean;
+  showOzonBanner?: boolean;
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({
@@ -22,10 +23,41 @@ const MainMenu: React.FC<MainMenuProps> = ({
   audioSettings,
   toggleMusic,
   toggleSfx,
-  isMobile = false
+  isMobile = false,
+  showOzonBanner = false
 }) => {
+  const [windowSize, setWindowSize] = React.useState({ width: typeof window !== 'undefined' ? window.innerWidth : 0, height: typeof window !== 'undefined' ? window.innerHeight : 0 });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      console.log(`[MainMenu] Screen size changed: ${window.innerWidth}x${window.innerHeight}`);
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    console.log(`[MainMenu] Initial screen size: ${window.innerWidth}x${window.innerHeight}`);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate dynamic banner size to prevent overlapping
+  // We make it at most 30% of width, but also ensure it doesn't exceed 30% of height to avoid overlapping central panel
+  const bannerSize = Math.max(
+    60, // Minimum acceptable size
+    Math.min(
+      500, // Maximum size
+      windowSize.width * 0.25, // Up to 25% of width
+      windowSize.height * 0.30 // Up to 30% of height to prevent vertical overlap
+    )
+  );
+
+  React.useEffect(() => {
+    console.log(`[MainMenu] Dynamic banner size calculated: ${bannerSize}px`);
+  }, [bannerSize]);
+
   return (
-    <div className={`h-full w-full bg-slate-100 flex relative overflow-hidden ${isMobile ? 'flex-col items-center justify-start pt-4 px-4 pb-4' : 'items-center justify-center p-4'}`}>
+    <div className={`h-full w-full bg-slate-100 flex relative overflow-hidden ${isMobile ? 'flex-col items-center justify-center p-4' : 'items-center justify-center p-4'}`}>
       {/* Декоративный фон */}
       <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
 
@@ -114,6 +146,25 @@ const MainMenu: React.FC<MainMenuProps> = ({
           FLL Games • 2025
         </div>
       </div>
+
+      {showOzonBanner && (
+        <a
+          href="https://vk.ru/market/product/nastolnaya-igra-quotadmiral-taktika-risk-i-sudbaquot-kompaktnaya-versia-227786453-8922274"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-4 right-4 z-[60] shadow-xl rounded-2xl overflow-hidden transition-transform hover:scale-105"
+          style={{
+            width: `${bannerSize}px`,
+            height: `${bannerSize}px`
+          }}
+        >
+          <img
+            src="https://storage.yandexcloud.net/kadastrgame/98884.png"
+            alt="Настольная игра Адмирал"
+            className="w-full h-full object-cover"
+          />
+        </a>
+      )}
 
       <style>{`
         @keyframes bounce-subtle {

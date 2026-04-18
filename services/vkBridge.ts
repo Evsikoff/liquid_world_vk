@@ -15,16 +15,27 @@ let isInitialized = false;
 // Утилита для задержки
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Утилита для выполнения промиса с таймаутом
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+};
+
 // Функция повторных попыток с экспоненциальной задержкой
 async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
+  timeoutMs: number = 2000
 ): Promise<T> {
   let lastError: any;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await operation();
+      return await withTimeout(operation(), timeoutMs);
     } catch (error) {
       lastError = error;
       if (attempt < maxRetries - 1) {
@@ -44,14 +55,15 @@ export async function initVKBridge(): Promise<boolean> {
   }
 
   try {
+    // If not in iframe or similar vk environment, it will fail fast thanks to timeout
     await withRetry(async () => {
-      await vkBridge.send('VKWebAppInit');
-    }, 3, 500);
+      return await vkBridge.send('VKWebAppInit');
+    }, 2, 500, 1500);
     isInitialized = true;
     console.log('VK Bridge initialized successfully');
     return true;
   } catch (error) {
-    console.error('Failed to initialize VK Bridge:', error);
+    console.error('Failed to initialize VK Bridge (might be outside VK):', error);
     return false;
   }
 }
